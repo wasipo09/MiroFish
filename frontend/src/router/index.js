@@ -7,46 +7,15 @@ import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 
 const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: Home
-  },
-  {
-    path: '/process/:projectId',
-    name: 'Process',
-    component: Process,
-    props: true
-  },
-  {
-    path: '/simulation/:simulationId',
-    name: 'Simulation',
-    component: SimulationView,
-    props: true
-  },
-  {
-    path: '/simulation/:simulationId/start',
-    name: 'SimulationRun',
-    component: SimulationRunView,
-    props: true
-  },
-  {
-    path: '/report/:reportId',
-    name: 'Report',
-    component: ReportView,
-    props: true
-  },
-  {
-    path: '/interaction/:reportId',
-    name: 'Interaction',
-    component: InteractionView,
-    props: true
-  }
+  { path: '/', name: 'Home', component: Home, meta: { title: 'News Analysis' } },
+  { path: '/market-research/:projectId', alias: '/process/:projectId', name: 'Process', component: Process, props: true, meta: { title: 'Advanced Market Research Engine' } },
+  { path: '/market-reaction/:simulationId', alias: '/simulation/:simulationId', name: 'Simulation', component: SimulationView, props: true, meta: { title: 'Market Reaction Setup' } },
+  { path: '/market-reaction/:simulationId/run', alias: '/simulation/:simulationId/start', name: 'SimulationRun', component: SimulationRunView, props: true, meta: { title: 'Market Reaction Run' } },
+  { path: '/news-report/:reportId', alias: '/report/:reportId', name: 'Report', component: ReportView, props: true, meta: { title: 'Market News Report' } },
+  { path: '/research-interaction/:reportId', alias: '/interaction/:reportId', name: 'Interaction', component: InteractionView, props: true, meta: { title: 'Research Interaction' } }
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
+const router = createRouter({ history: createWebHistory(), routes })
+router.afterEach(to => { document.title = `${to.meta.title || 'News Intelligence'} | PilkQuant` })
 
 export default router

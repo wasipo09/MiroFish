@@ -13,6 +13,40 @@ class ValidationError(ValueError):
 
 
 _ALLOWED_HORIZONS = {"intraday", "1-5d", "1-4w", "1-3m"}
+_MAX_HEADLINE_LENGTH = 300
+_MAX_CONTENT_LENGTH = 20_000
+_MAX_SOURCES = 20
+_MAX_SOURCE_LENGTH = 500
+_MAX_ASSETS = 50
+_MAX_ASSET_LENGTH = 50
+
+
+def _required_string(payload: dict[str, Any], field: str, max_length: int) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ValidationError(f"{field} must be a non-empty string")
+    value = value.strip()
+    if len(value) > max_length:
+        raise ValidationError(f"{field} must be at most {max_length} characters")
+    return value
+
+
+def _string_list(
+    payload: dict[str, Any], field: str, *, required: bool, max_count: int, max_length: int
+) -> tuple[str, ...]:
+    value = payload.get(field, [])
+    if not isinstance(value, list):
+        raise ValidationError(f"{field} must be a list of strings")
+    if required and not value:
+        raise ValidationError(f"{field} must contain at least one item")
+    if len(value) > max_count:
+        raise ValidationError(f"{field} must contain at most {max_count} items")
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        raise ValidationError(f"{field} must contain only non-empty strings")
+    cleaned = tuple(item.strip() for item in value)
+    if any(len(item) > max_length for item in cleaned):
+        raise ValidationError(f"{field} items must be at most {max_length} characters")
+    return cleaned
 
 
 @dataclass(frozen=True)
@@ -27,26 +61,18 @@ class NewsAnalysisRequest:
     def from_dict(cls, payload: dict[str, Any] | None) -> "NewsAnalysisRequest":
         if not isinstance(payload, dict):
             raise ValidationError("request body must be an object")
-        headline = str(payload.get("headline", "")).strip()
-        content = str(payload.get("content", "")).strip()
-        sources = payload.get("sources", [])
-        assets = payload.get("assets", [])
-        horizon = str(payload.get("horizon", "1-5d")).strip()
-        if not headline:
-            raise ValidationError("headline is required")
-        if not content:
-            raise ValidationError("content is required")
-        if not isinstance(sources, list) or not sources or not all(str(s).strip() for s in sources):
-            raise ValidationError("at least one source is required")
-        if not isinstance(assets, list):
-            raise ValidationError("assets must be a list")
+        headline = _required_string(payload, "headline", _MAX_HEADLINE_LENGTH)
+        content = _required_string(payload, "content", _MAX_CONTENT_LENGTH)
+        horizon = _required_string(payload, "horizon", 20)
+        sources = _string_list(payload, "sources", required=True, max_count=_MAX_SOURCES, max_length=_MAX_SOURCE_LENGTH)
+        assets = _string_list(payload, "assets", required=False, max_count=_MAX_ASSETS, max_length=_MAX_ASSET_LENGTH)
         if horizon not in _ALLOWED_HORIZONS:
             raise ValidationError(f"horizon must be one of {sorted(_ALLOWED_HORIZONS)}")
         return cls(
             headline=headline,
             content=content,
-            sources=tuple(str(s).strip() for s in sources),
-            assets=tuple(dict.fromkeys(str(a).strip() for a in assets if str(a).strip())),
+            sources=sources,
+            assets=tuple(dict.fromkeys(assets)),
             horizon=horizon,
         )
 

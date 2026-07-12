@@ -29,9 +29,9 @@ def test_valid_request_emits_deterministic_advisory_contract():
 
 
 @pytest.mark.parametrize("payload, message", [
-    ({"headline": "", "content": "long enough content", "sources": ["wire:a"]}, "headline"),
-    ({"headline": "Valid", "content": "", "sources": ["wire:a"]}, "content"),
-    ({"headline": "Valid", "content": "Some news", "sources": []}, "source"),
+    ({"headline": "", "content": "long enough content", "sources": ["wire:a"], "horizon": "1-5d"}, "headline"),
+    ({"headline": "Valid", "content": "", "sources": ["wire:a"], "horizon": "1-5d"}, "content"),
+    ({"headline": "Valid", "content": "Some news", "sources": [], "horizon": "1-5d"}, "source"),
     ({"headline": "Valid", "content": "Some news", "sources": ["wire:a"], "horizon": "forever"}, "horizon"),
 ])
 def test_request_validation_rejects_incomplete_or_unbounded_input(payload, message):
@@ -45,7 +45,49 @@ def test_analysis_does_not_expose_execution_instructions():
         "content": "Management raised full-year revenue guidance after stronger demand.",
         "sources": ["filing:8-k"],
         "assets": ["ACME"],
+        "horizon": "1-5d",
     }))
 
     forbidden = {"order", "quantity", "broker", "execute", "place_order"}
     assert forbidden.isdisjoint(result)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("headline", 123), ("headline", True),
+    ("content", {"text": "news"}),
+    ("horizon", 5), ("horizon", False),
+])
+def test_scalar_fields_require_actual_strings(field, value):
+    payload = {"headline": "Valid headline", "content": "Valid content", "sources": ["wire:a"], "assets": ["ACME"], "horizon": "1-5d"}
+    payload[field] = value
+    with pytest.raises(ValidationError, match=field):
+        NewsAnalysisRequest.from_dict(payload)
+
+
+def test_horizon_is_required():
+    with pytest.raises(ValidationError, match="horizon"):
+        NewsAnalysisRequest.from_dict({"headline": "Valid headline", "content": "Valid content", "sources": ["wire:a"]})
+
+
+@pytest.mark.parametrize("field,value", [
+    ("sources", "wire:a"), ("sources", [123]), ("sources", [True]),
+    ("sources", [{}]), ("sources", ["   "]), ("assets", "ACME"),
+    ("assets", [123]), ("assets", [False]), ("assets", [{}]), ("assets", [""]),
+])
+def test_collection_fields_require_lists_of_non_empty_strings(field, value):
+    payload = {"headline": "Valid headline", "content": "Valid content", "sources": ["wire:a"], "assets": ["ACME"], "horizon": "1-5d"}
+    payload[field] = value
+    with pytest.raises(ValidationError, match=field):
+        NewsAnalysisRequest.from_dict(payload)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("headline", "h" * 301), ("content", "c" * 20001),
+    ("sources", [f"source:{i}" for i in range(21)]), ("sources", ["s" * 501]),
+    ("assets", [f"A{i}" for i in range(51)]), ("assets", ["A" * 51]),
+])
+def test_request_fields_enforce_length_and_count_limits(field, value):
+    payload = {"headline": "Valid headline", "content": "Valid content", "sources": ["wire:a"], "assets": ["ACME"], "horizon": "1-5d"}
+    payload[field] = value
+    with pytest.raises(ValidationError, match=field):
+        NewsAnalysisRequest.from_dict(payload)

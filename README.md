@@ -13,7 +13,7 @@ A focused news-event research workbench. Supply reporting, filings, transcripts,
 
 ## Architecture
 
-This fork deliberately keeps MiroFish's useful Flask/Vue, GraphRAG, participant-profile, simulation, and report machinery while narrowing the primary product to market-news intelligence. `backend/app/news_intelligence.py` adds a deterministic, network-free domain contract. `POST /api/news/analyze` validates a request and returns a stable research scaffold that downstream simulation/report stages can enrich.
+This fork deliberately keeps MiroFish's useful Flask/Vue, GraphRAG, participant-profile, simulation, and report machinery while narrowing the primary product to market-news intelligence. `backend/app/news_intelligence.py` adds a deterministic, network-free domain contract. `POST /api/news/analyze` validates a request and returns a stable research scaffold that downstream simulation/report stages can enrich. Its direction and scores come from a small lexical ruleset: they are a baseline for integration and UI development, **not real predictive analysis** and not a substitute for source verification or professional judgment.
 
 ## Structured output
 
@@ -32,7 +32,7 @@ This fork deliberately keeps MiroFish's useful Flask/Vue, GraphRAG, participant-
 }
 ```
 
-Accepted horizons are `intraday`, `1-5d`, `1-4w`, and `1-3m`. The deterministic endpoint makes no LLM or network calls.
+Accepted horizons are `intraday`, `1-5d`, `1-4w`, and `1-3m`. The deterministic endpoint makes no LLM or network calls. Required request fields are `headline`, `content`, `sources` (a non-empty string list), `assets` (a string list, which may be empty), and `horizon`.
 
 ## Setup
 
@@ -56,8 +56,8 @@ npm run dev
 Verification:
 
 ```bash
-cd backend && python -m pytest tests -q
-cd frontend && npm run build
+(cd backend && python -m pytest tests -q)
+npm --prefix frontend run build
 ```
 
 Environment variables for LLM/Zep-backed simulation remain documented in `.env.example`. Never commit credentials. The deterministic news contract and its tests require no live credentials.
