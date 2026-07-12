@@ -58,3 +58,7 @@ backend/uploads/
 
 # Docker 数据
 data/
+
+# Generated news briefing artifacts and scheduler state
+briefings/
+var/
