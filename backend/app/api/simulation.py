@@ -3,6 +3,7 @@
 Step2: Zep实体读取与过滤、OASIS模拟准备与运行（全程自动化）
 """
 
+import json
 import os
 import traceback
 from flask import request, jsonify, send_file
@@ -262,13 +263,21 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     if not os.path.exists(simulation_dir):
         return False, {"reason": "模拟目录不存在"}
     
-    # 必要文件列表（不包括脚本，脚本位于 backend/scripts/）
-    required_files = [
-        "state.json",
-        "simulation_config.json",
-        "reddit_profiles.json",
-        "twitter_profiles.csv"
-    ]
+    # Check the platform-specific artifacts declared by the simulation state.
+    state_file = os.path.join(simulation_dir, "state.json")
+    state_data = {}
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, 'r', encoding='utf-8') as f:
+                state_data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            state_data = {}
+
+    required_files = ["state.json", "simulation_config.json"]
+    if state_data.get("enable_reddit", True):
+        required_files.append("reddit_profiles.json")
+    if state_data.get("enable_twitter", True):
+        required_files.append("twitter_profiles.csv")
     
     # 检查文件是否存在
     existing_files = []
@@ -290,7 +299,6 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     # 检查state.json中的状态
     state_file = os.path.join(simulation_dir, "state.json")
     try:
-        import json
         with open(state_file, 'r', encoding='utf-8') as f:
             state_data = json.load(f)
         
@@ -308,7 +316,7 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
         # - completed: 运行完成，说明准备早就完成了
         # - stopped: 已停止，说明准备早就完成了
         # - failed: 运行失败（但准备是完成的）
-        prepared_statuses = ["ready", "preparing", "running", "completed", "stopped", "failed"]
+        prepared_statuses = ["ready", "preparing", "running", "completed", "stopped", "paused", "failed"]
         if status in prepared_statuses and config_generated:
             # 获取文件统计信息
             profiles_file = os.path.join(simulation_dir, "reddit_profiles.json")

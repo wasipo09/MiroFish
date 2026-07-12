@@ -621,13 +621,20 @@ class SimulationRunner:
                                 
                                 # 检测 simulation_end 事件，标记平台已完成
                                 if event_type == "simulation_end":
+                                    total_actions = int(action_data.get("total_actions", 0) or 0)
                                     if platform == "twitter":
                                         state.twitter_completed = True
                                         state.twitter_running = False
+                                        state.twitter_actions_count = max(
+                                            state.twitter_actions_count, total_actions
+                                        )
                                         logger.info(f"Twitter 模拟已完成: {state.simulation_id}, total_rounds={action_data.get('total_rounds')}, total_actions={action_data.get('total_actions')}")
                                     elif platform == "reddit":
                                         state.reddit_completed = True
                                         state.reddit_running = False
+                                        state.reddit_actions_count = max(
+                                            state.reddit_actions_count, total_actions
+                                        )
                                         logger.info(f"Reddit 模拟已完成: {state.simulation_id}, total_rounds={action_data.get('total_rounds')}, total_actions={action_data.get('total_actions')}")
                                     
                                     # 检查是否所有启用的平台都已完成

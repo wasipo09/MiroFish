@@ -423,6 +423,27 @@ class TwitterSimulationRunner:
     def _get_db_path(self) -> str:
         """获取数据库路径"""
         return os.path.join(self.simulation_dir, "twitter_simulation.db")
+
+    def _append_action_event(self, event: Dict[str, Any]) -> None:
+        """Emit lifecycle progress in the format consumed by SimulationRunner."""
+        action_dir = os.path.join(self.simulation_dir, "twitter")
+        os.makedirs(action_dir, exist_ok=True)
+        action_log = os.path.join(action_dir, "actions.jsonl")
+        with open(action_log, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+    def _get_total_action_count(self) -> int:
+        """Return the number of actions persisted by the OASIS platform."""
+        db_path = self._get_db_path()
+        if not os.path.exists(db_path):
+            return 0
+        try:
+            connection = sqlite3.connect(db_path)
+            count = connection.execute("SELECT COUNT(*) FROM trace").fetchone()[0]
+            connection.close()
+            return int(count)
+        except (sqlite3.Error, TypeError, ValueError):
+            return 0
     
     def _create_model(self):
         """
@@ -641,17 +662,22 @@ class TwitterSimulationRunner:
                 self.env, simulated_hour, round_num
             )
             
-            if not active_agents:
-                continue
-            
-            # 构建动作
-            actions = {
-                agent: LLMAction()
-                for _, agent in active_agents
-            }
-            
-            # 执行动作
-            await self.env.step(actions)
+            if active_agents:
+                # 构建动作
+                actions = {
+                    agent: LLMAction()
+                    for _, agent in active_agents
+                }
+
+                # 执行动作
+                await self.env.step(actions)
+
+            self._append_action_event({
+                "event_type": "round_end",
+                "round": round_num + 1,
+                "simulated_hours": (simulated_minutes + minutes_per_round) / 60,
+                "actions_count": 0,
+            })
             
             # 打印进度
             if (round_num + 1) % 10 == 0 or round_num == 0:
@@ -666,6 +692,12 @@ class TwitterSimulationRunner:
         print(f"\n模拟循环完成!")
         print(f"  - 总耗时: {total_elapsed:.1f}秒")
         print(f"  - 数据库: {db_path}")
+
+        self._append_action_event({
+            "event_type": "simulation_end",
+            "total_rounds": total_rounds,
+            "total_actions": self._get_total_action_count(),
+        })
         
         # 是否进入等待命令模式
         if self.wait_for_commands:
