@@ -62,6 +62,20 @@ npm --prefix frontend run build
 
 Environment variables for LLM/Zep-backed simulation remain documented in `.env.example`. Never commit credentials. The deterministic news contract and its tests require no live credentials.
 
+## Scheduled RSS briefing automation
+
+The stdlib-based collector reads an explicit RSS/Atom allowlist, includes only unseen stories, caps each run, and writes timestamped JSON and Markdown artifacts. Defaults cover Federal Reserve macro news, CoinDesk crypto news, and Dow Jones major-markets news; no API key is required. Each story is passed through the same deterministic `NewsAnalysisRequest` / `analyze_news` contract described above. Feed text is treated as untrusted data, not instructions. A failed or malformed feed is recorded in the artifact without preventing other feeds from being processed.
+
+One-shot command from the repository root:
+
+```bash
+(cd backend && uv run python -m app.news_briefing --output-dir ../var/news-briefings --state-file ../var/news-seen.json --max-items 12)
+```
+
+Override the allowlist with repeatable `--feed NAME=URL` options or the comma-separated `PILKQUANT_NEWS_FEEDS` environment variable. `PILKQUANT_NEWS_OUTPUT_DIR`, `PILKQUANT_NEWS_STATE_FILE`, and `PILKQUANT_NEWS_MAX_ITEMS` provide the other configuration equivalents. For network-free fixture runs, pass `--fixtures mapping.json`, where the JSON object maps each configured feed URL to an RSS/Atom file. `--dry-run` still writes artifacts but does not update seen state.
+
+Run this command every three hours using your operating system's scheduler and arrange for it to start at login/boot if desired. Scheduling and process supervision (for example, macOS `launchd`, cron, or systemd) are deliberately external; this repository neither installs nor starts those services. Briefings are advisory research scaffolds only, place no trades, emit no order instructions, and claim no predictive edge.
+
 ## License and attribution
 
 Licensed under the [GNU Affero General Public License v3.0](LICENSE). This project is a focused fork of [MiroFish](https://github.com/666ghj/MiroFish) by the MiroFish contributors; their graph, simulation, and reporting foundations remain central to this codebase. Fork lineage: [wasipo09/MiroFish](https://github.com/wasipo09/MiroFish).
