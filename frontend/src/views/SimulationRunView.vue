@@ -21,6 +21,13 @@
       </div>
 
       <div class="header-right">
+        <RouterLink
+          v-if="currentStatus === 'completed'"
+          class="posts-link"
+          :to="`/market-reaction/${currentSimulationId}/posts`"
+        >
+          Read posts
+        </RouterLink>
         <LanguageSwitcher />
         <div class="step-divider"></div>
         <div class="workflow-step">
@@ -121,6 +128,7 @@ const statusClass = computed(() => {
 
 const statusText = computed(() => {
   if (currentStatus.value === 'error') return 'Error'
+  if (currentStatus.value === 'stopped') return 'Stopped'
   if (currentStatus.value === 'completed') return 'Completed'
   return 'Running'
 })
@@ -382,6 +390,16 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.posts-link {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .workflow-step {

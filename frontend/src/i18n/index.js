@@ -14,12 +14,18 @@ for (const path in localeFiles) {
   }
 }
 
-const savedLocale = localStorage.getItem('locale') || 'zh'
+const englishDefaultMigration = 'pilkquant-english-default-v1'
+if (!localStorage.getItem(englishDefaultMigration)) {
+  localStorage.setItem('locale', 'en')
+  localStorage.setItem(englishDefaultMigration, 'complete')
+}
+
+const savedLocale = localStorage.getItem('locale') || 'en'
 
 const i18n = createI18n({
   legacy: false,
   locale: savedLocale,
-  fallbackLocale: 'zh',
+  fallbackLocale: 'en',
   messages
 })
 

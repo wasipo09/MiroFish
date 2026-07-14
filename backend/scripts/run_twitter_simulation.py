@@ -22,8 +22,9 @@ import random
 import signal
 import sys
 import sqlite3
+import unicodedata
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Callable, Dict, Any, List, Optional
 
 # 全局变量：用于信号处理
 _shutdown_event = None
@@ -48,6 +49,46 @@ else:
 
 
 import re
+
+
+def contains_non_english_letters(text: str) -> bool:
+    """Return True when text contains letters from a non-Latin script."""
+    for character in text:
+        if unicodedata.category(character).startswith("L"):
+            if "LATIN" not in unicodedata.name(character, ""):
+                return True
+    return False
+
+
+def normalize_posts_to_english(
+    db_path: str, translator: Callable[[str], str]
+) -> int:
+    """Translate CJK post fields to English before exposing simulation results."""
+    connection = sqlite3.connect(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT post_id, content, quote_content FROM post"
+        ).fetchall()
+        updates = []
+        translated_fields = 0
+        for post_id, content, quote_content in rows:
+            normalized = []
+            for value in (content, quote_content):
+                if value and contains_non_english_letters(value):
+                    value = translator(value).strip()
+                    if not value or contains_non_english_letters(value):
+                        raise ValueError("Translation did not produce English-only text")
+                    translated_fields += 1
+                normalized.append(value)
+            updates.append((normalized[0], normalized[1], post_id))
+        connection.executemany(
+            "UPDATE post SET content = ?, quote_content = ? WHERE post_id = ?",
+            updates,
+        )
+        connection.commit()
+        return translated_fields
+    finally:
+        connection.close()
 
 
 class UnicodeFormatter(logging.Formatter):
@@ -410,6 +451,7 @@ class TwitterSimulationRunner:
         self.env = None
         self.agent_graph = None
         self.ipc_handler = None
+        self.model = None
         
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
@@ -444,6 +486,22 @@ class TwitterSimulationRunner:
             return int(count)
         except (sqlite3.Error, TypeError, ValueError):
             return 0
+
+    def _translate_to_english(self, text: str) -> str:
+        """Translate simulation content with the configured local model."""
+        if self.model is None:
+            raise RuntimeError("LLM model is not initialized")
+        response = self.model.run([
+            {
+                "role": "system",
+                "content": (
+                    "Translate the user's market-simulation text into natural English. "
+                    "Return only the English translation, without commentary or markdown."
+                ),
+            },
+            {"role": "user", "content": text},
+        ])
+        return response.choices[0].message.content
     
     def _create_model(self):
         """
@@ -588,6 +646,7 @@ class TwitterSimulationRunner:
         # 创建模型
         print("\n初始化LLM模型...")
         model = self._create_model()
+        self.model = model
         
         # 加载Agent图
         print("加载Agent Profile...")
@@ -692,6 +751,12 @@ class TwitterSimulationRunner:
         print(f"\n模拟循环完成!")
         print(f"  - 总耗时: {total_elapsed:.1f}秒")
         print(f"  - 数据库: {db_path}")
+
+        translated_fields = normalize_posts_to_english(
+            db_path, self._translate_to_english
+        )
+        if translated_fields:
+            print(f"  - English-normalized fields: {translated_fields}")
 
         self._append_action_event({
             "event_type": "simulation_end",
